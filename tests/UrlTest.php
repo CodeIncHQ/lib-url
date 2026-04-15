@@ -363,10 +363,10 @@ class UrlTest extends TestCase
         self::assertSame('/', $url->buildUrl());
     }
 
-    public function testBuildUrlDefaultsToHttpScheme(): void
+    public function testBuildUrlSchemelessAuthority(): void
     {
         $url = (new Url())->withHost('example.com');
-        self::assertSame('http://example.com/', $url->buildUrl());
+        self::assertSame('//example.com/', $url->buildUrl());
     }
 
     // --- __toString ---
@@ -400,7 +400,7 @@ class UrlTest extends TestCase
             ->withHost('example.com')
             ->withQueryParams(['q' => 'hello world', 'tag' => 'a&b']);
 
-        self::assertSame('q=hello+world&tag=a%26b', $url->getQuery());
+        self::assertSame('q=hello%20world&tag=a%26b', $url->getQuery());
     }
 
     public function testFragmentEncoding(): void
@@ -409,13 +409,59 @@ class UrlTest extends TestCase
             ->withHost('example.com')
             ->withFragment('section one');
 
-        self::assertStringContainsString('#section+one', $url->getFullUrl());
+        self::assertStringContainsString('#section%20one', $url->getFullUrl());
     }
 
     public function testPathWithEncodedCharacters(): void
     {
         $url = Url::fromString('https://example.com/path%20with%20spaces');
         self::assertSame('/path%20with%20spaces', $url->getPath());
+    }
+
+    // --- Standard port filtering (PSR-7) ---
+
+    public function testGetPortReturnsNullForStandardHttpPort(): void
+    {
+        $url = Url::fromString('http://example.com:80/path');
+        self::assertNull($url->getPort());
+    }
+
+    public function testGetPortReturnsNullForStandardHttpsPort(): void
+    {
+        $url = Url::fromString('https://example.com:443/path');
+        self::assertNull($url->getPort());
+    }
+
+    public function testGetPortReturnsNonStandardPort(): void
+    {
+        $url = Url::fromString('https://example.com:8080/path');
+        self::assertSame(8080, $url->getPort());
+    }
+
+    public function testStandardPortOmittedFromAuthority(): void
+    {
+        $url = Url::fromString('https://example.com:443/path');
+        self::assertSame('example.com', $url->getAuthority());
+    }
+
+    public function testStandardPortOmittedFromFullUrl(): void
+    {
+        $url = Url::fromString('https://example.com:443/path');
+        self::assertSame('https://example.com/path', $url->getFullUrl());
+    }
+
+    // --- Host lowercase (PSR-7) ---
+
+    public function testWithHostLowercases(): void
+    {
+        $url = (new Url())->withHost('Example.COM');
+        self::assertSame('example.com', $url->getHost());
+    }
+
+    public function testFromStringLowercasesHost(): void
+    {
+        $url = Url::fromString('https://Example.COM/path');
+        self::assertSame('example.com', $url->getHost());
     }
 
     // --- Edge cases ---
@@ -484,13 +530,13 @@ class UrlTest extends TestCase
         $url = (new Url())
             ->withScheme('https')
             ->withHost('api.example.com')
-            ->withPort(443)
+            ->withPort(8443)
             ->withPath('/v2/users')
             ->withQueryParams(['page' => '1', 'limit' => '50'])
             ->withFragment('results');
 
         self::assertSame(
-            'https://api.example.com:443/v2/users?page=1&limit=50#results',
+            'https://api.example.com:8443/v2/users?page=1&limit=50#results',
             $url->getFullUrl(),
         );
 
@@ -505,7 +551,7 @@ class UrlTest extends TestCase
         );
 
         // Original unchanged
-        self::assertSame(443, $url->getPort());
+        self::assertSame(8443, $url->getPort());
         self::assertSame('results', $url->getFragment());
     }
 }

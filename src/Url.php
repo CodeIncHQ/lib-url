@@ -12,6 +12,11 @@ use Psr\Http\Message\UriInterface;
  */
 class Url implements UrlInterface
 {
+    private const STANDARD_PORTS = [
+        'http' => 80,
+        'https' => 443,
+    ];
+
     private ?string $scheme = null;
     private ?string $host = null;
     private ?int $port = null;
@@ -36,7 +41,7 @@ class Url implements UrlInterface
             $instance->scheme = strtolower($parsed['scheme']);
         }
         if (isset($parsed['host'])) {
-            $instance->host = $parsed['host'];
+            $instance->host = strtolower($parsed['host']);
         }
         if (isset($parsed['port'])) {
             $instance->port = $parsed['port'];
@@ -68,13 +73,12 @@ class Url implements UrlInterface
         }
 
         if (isset($_SERVER['HTTP_HOST'])) {
-            $hostPort = $_SERVER['HTTP_HOST'];
-            $colonPos = strpos($hostPort, ':');
-            if ($colonPos !== false) {
-                $instance->host = substr($hostPort, 0, $colonPos);
-                $instance->port = (int) substr($hostPort, $colonPos + 1);
-            } else {
-                $instance->host = $hostPort;
+            $parsed = parse_url('//' . $_SERVER['HTTP_HOST']);
+            if ($parsed !== false && isset($parsed['host'])) {
+                $instance->host = strtolower($parsed['host']);
+                if (isset($parsed['port'])) {
+                    $instance->port = $parsed['port'];
+                }
             }
         }
 
@@ -147,10 +151,8 @@ class Url implements UrlInterface
         $instance = static::fromPsr7Uri($request->getUri());
         $queryParams = $request->getQueryParams();
         if (!empty($queryParams)) {
-            $instance->query = [];
-            foreach ($queryParams as $key => $value) {
-                $instance->query[(string) $key] = (string) $value;
-            }
+            parse_str(http_build_query($queryParams), $normalized);
+            $instance->query = array_map(strval(...), $normalized);
         }
         return $instance;
     }
@@ -172,8 +174,9 @@ class Url implements UrlInterface
         if ($this->host !== null) {
             $authority .= $this->host;
         }
-        if ($this->port !== null) {
-            $authority .= ':' . $this->port;
+        $port = $this->getPort();
+        if ($port !== null) {
+            $authority .= ':' . $port;
         }
         return $authority;
     }
@@ -197,6 +200,14 @@ class Url implements UrlInterface
 
     public function getPort(): ?int
     {
+        if (
+            $this->port !== null
+            && $this->scheme !== null
+            && isset(self::STANDARD_PORTS[$this->scheme])
+            && $this->port === self::STANDARD_PORTS[$this->scheme]
+        ) {
+            return null;
+        }
         return $this->port;
     }
 
@@ -209,9 +220,9 @@ class Url implements UrlInterface
     {
         $parts = [];
         foreach ($this->query as $param => $value) {
-            $part = urlencode((string) $param);
+            $part = rawurlencode((string) $param);
             if ($value !== '') {
-                $part .= '=' . urlencode($value);
+                $part .= '=' . rawurlencode($value);
             }
             $parts[] = $part;
         }
@@ -248,7 +259,7 @@ class Url implements UrlInterface
     public function withHost(string $host): static
     {
         $clone = clone $this;
-        $clone->host = $host !== '' ? $host : null;
+        $clone->host = $host !== '' ? strtolower($host) : null;
         return $clone;
     }
 
@@ -378,8 +389,10 @@ class Url implements UrlInterface
         $url = '';
 
         if ($withHost && $this->host !== null) {
-            $scheme = $this->scheme ?? 'http';
-            $url .= $scheme . '://';
+            if ($this->scheme !== null) {
+                $url .= $this->scheme . ':';
+            }
+            $url .= '//';
 
             if ($withUserInfo && $this->user !== null) {
                 $url .= $this->getUserInfo() . '@';
@@ -387,8 +400,9 @@ class Url implements UrlInterface
 
             $url .= $this->host;
 
-            if ($withPort && $this->port !== null) {
-                $url .= ':' . $this->port;
+            $port = $this->getPort();
+            if ($withPort && $port !== null) {
+                $url .= ':' . $port;
             }
         }
 
@@ -399,7 +413,7 @@ class Url implements UrlInterface
         }
 
         if ($withFragment && $this->fragment !== null) {
-            $url .= '#' . urlencode($this->fragment);
+            $url .= '#' . rawurlencode($this->fragment);
         }
 
         return $url;
