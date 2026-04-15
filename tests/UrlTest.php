@@ -1,96 +1,511 @@
 <?php
-//
-// +---------------------------------------------------------------------+
-// | CODE INC. SOURCE CODE                                               |
-// +---------------------------------------------------------------------+
-// | Copyright (c) 2017 - Code Inc. SAS - All Rights Reserved.           |
-// | Visit https://www.codeinc.fr for more information about licensing.  |
-// +---------------------------------------------------------------------+
-// | NOTICE:  All information contained herein is, and remains the       |
-// | property of Code Inc. SAS. The intellectual and technical concepts  |
-// | contained herein are proprietary to Code Inc. SAS are protected by  |
-// | trade secret or copyright law. Dissemination of this information or |
-// | reproduction of this material  is strictly forbidden unless prior   |
-// | written permission is obtained from Code Inc. SAS.                  |
-// +---------------------------------------------------------------------+
-//
-// Author:   Joan Fabrégat <joan@codeinc.fr>
-// Date:     19/02/2018
-// Time:     12:46
-// Project:  Url
-//
+
 declare(strict_types=1);
+
 namespace CodeInc\Url\Tests;
+
 use CodeInc\Url\Url;
+use CodeInc\Url\UrlInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\UriInterface;
 
-
-/**
- * Class UrlTest
- *
- * @uses Url
- * @package Tests\CodeInc\Url
- * @author Joan Fabrégat <joan@codeinc.fr>
- */
 class UrlTest extends TestCase
 {
-	// test params
-	private const TEST_SCHEME = "https";
-	private const TEST_USER = "user";
-	private const TEST_PASSWORD = "pass";
-	private const TEST_HOST = "www.example.com";
-	private const TEST_PORT = 8080;
-	private const TEST_PATH = "/a/great_path";
-	private const TEST_QUERY = "p1=val1&p2&p3=1&p4=0";
-	private const TEST_FRAGMENT = "fragment";
+    private const SCHEME = 'https';
+    private const USER = 'user';
+    private const PASSWORD = 'pass';
+    private const HOST = 'www.example.com';
+    private const PORT = 8080;
+    private const PATH = '/a/great_path';
+    private const QUERY = 'p1=val1&p2&p3=1&p4=0';
+    private const FRAGMENT = 'fragment';
 
-	// test URL
-    private const TEST_FULL_URL = self::TEST_SCHEME."://".self::TEST_USER.":".self::TEST_PASSWORD."@".self::TEST_HOST
-    .":".self::TEST_PORT.self::TEST_PATH."?".self::TEST_QUERY."#".self::TEST_FRAGMENT;
-    private const TEST_REL_URL = self::TEST_PATH."?".self::TEST_QUERY."#".self::TEST_FRAGMENT;
+    private const FULL_URL = self::SCHEME . '://' . self::USER . ':' . self::PASSWORD . '@'
+        . self::HOST . ':' . self::PORT . self::PATH . '?' . self::QUERY . '#' . self::FRAGMENT;
 
-    /**
-     * Tests the URL builder.
-     */
-    public function testUrlBuilder():void
+    private const REL_URL = self::PATH . '?' . self::QUERY . '#' . self::FRAGMENT;
+
+    // --- Parsing ---
+
+    public function testFromString(): void
+    {
+        $url = Url::fromString(self::FULL_URL);
+
+        self::assertSame(self::SCHEME, $url->getScheme());
+        self::assertSame(self::USER, $url->getUser());
+        self::assertSame(self::PASSWORD, $url->getPassword());
+        self::assertSame(self::HOST, $url->getHost());
+        self::assertSame(self::PORT, $url->getPort());
+        self::assertSame(self::PATH, $url->getPath());
+        self::assertSame(self::QUERY, $url->getQuery());
+        self::assertSame(self::FRAGMENT, $url->getFragment());
+    }
+
+    public function testFromStringMinimal(): void
+    {
+        $url = Url::fromString('https://example.com');
+
+        self::assertSame('https', $url->getScheme());
+        self::assertSame('example.com', $url->getHost());
+        self::assertNull($url->getPort());
+        self::assertSame('', $url->getPath());
+        self::assertSame('', $url->getQuery());
+        self::assertSame('', $url->getFragment());
+        self::assertNull($url->getUser());
+        self::assertNull($url->getPassword());
+    }
+
+    public function testFromStringPathOnly(): void
+    {
+        $url = Url::fromString('/some/path?key=value');
+
+        self::assertSame('', $url->getScheme());
+        self::assertSame('', $url->getHost());
+        self::assertSame('/some/path', $url->getPath());
+        self::assertSame('key=value', $url->getQuery());
+    }
+
+    public function testFromStringInvalid(): void
+    {
+        $url = Url::fromString('://');
+
+        self::assertSame('', $url->getScheme());
+        self::assertSame('', $url->getHost());
+    }
+
+    public function testFromStringUserWithoutPassword(): void
+    {
+        $url = Url::fromString('https://admin@example.com/path');
+
+        self::assertSame('admin', $url->getUser());
+        self::assertNull($url->getPassword());
+        self::assertSame('admin', $url->getUserInfo());
+    }
+
+    // --- Builder (fluent interface) ---
+
+    public function testBuilder(): void
     {
         $url = (new Url())
-            ->withScheme(self::TEST_SCHEME)
-            ->withUserInfo(self::TEST_USER, self::TEST_PASSWORD)
-            ->withHost(self::TEST_HOST)
-            ->withPort(self::TEST_PORT)
-            ->withPath(self::TEST_PATH)
-            ->withQuery(self::TEST_QUERY)
-            ->withFragment(self::TEST_FRAGMENT);
-        $this->assertSame(self::TEST_FULL_URL, $url->getFullUrl());
-        $this->assertSame(self::TEST_REL_URL, $url->getRelUrl());
+            ->withScheme(self::SCHEME)
+            ->withUserInfo(self::USER, self::PASSWORD)
+            ->withHost(self::HOST)
+            ->withPort(self::PORT)
+            ->withPath(self::PATH)
+            ->withQuery(self::QUERY)
+            ->withFragment(self::FRAGMENT);
+
+        self::assertSame(self::FULL_URL, $url->getFullUrl());
+        self::assertSame(self::REL_URL, $url->getRelUrl());
     }
 
-    /**
-     * Tests the URL query.
-     */
-    public function testUrlQuery():void
+    public function testBuilderSchemeLowercased(): void
     {
-        $url = Url::fromString(self::TEST_FULL_URL)
-            ->withQuery(['p4' => 0])
-            ->withQuery(['p2' => null]);
-        $this->assertSame(self::TEST_FULL_URL, $url->getFullUrl());
-        $this->assertSame(self::TEST_REL_URL, $url->getRelUrl());
+        $url = (new Url())->withScheme('HTTPS');
+        self::assertSame('https', $url->getScheme());
     }
 
-	/**
-	 * Tests the URL parser.
-	 */
-	public function testUrlParser():void
+    // --- Immutability ---
+
+    public function testWithMethodsReturnNewInstance(): void
     {
-		$url = Url::fromString(self::TEST_FULL_URL);
-		$this->assertSame(self::TEST_SCHEME, $url->getScheme());
-		$this->assertSame(self::TEST_USER, $url->getUser());
-		$this->assertSame(self::TEST_PASSWORD, $url->getPassword());
-		$this->assertSame(self::TEST_HOST, $url->getHost());
-		$this->assertSame(self::TEST_PORT, $url->getPort());
-		$this->assertSame(self::TEST_PATH, $url->getPath());
-		$this->assertSame(self::TEST_QUERY, $url->getQuery());
-		$this->assertSame(self::TEST_FRAGMENT, $url->getFragment());
-	}
+        $original = Url::fromString(self::FULL_URL);
+
+        self::assertNotSame($original, $original->withScheme('http'));
+        self::assertNotSame($original, $original->withHost('other.com'));
+        self::assertNotSame($original, $original->withPort(9090));
+        self::assertNotSame($original, $original->withPath('/other'));
+        self::assertNotSame($original, $original->withQuery('x=1'));
+        self::assertNotSame($original, $original->withFragment('other'));
+        self::assertNotSame($original, $original->withUserInfo('other'));
+    }
+
+    public function testWithMethodsDoNotMutateOriginal(): void
+    {
+        $original = Url::fromString('https://example.com/path');
+        $original->withScheme('http');
+        $original->withHost('other.com');
+        $original->withPort(9090);
+
+        self::assertSame('https', $original->getScheme());
+        self::assertSame('example.com', $original->getHost());
+        self::assertNull($original->getPort());
+    }
+
+    // --- Without methods ---
+
+    public function testWithoutScheme(): void
+    {
+        $url = Url::fromString('https://example.com')->withoutScheme();
+        self::assertSame('', $url->getScheme());
+    }
+
+    public function testWithoutHost(): void
+    {
+        $url = Url::fromString('https://example.com/path')->withoutHost();
+        self::assertSame('', $url->getHost());
+    }
+
+    public function testWithoutPort(): void
+    {
+        $url = Url::fromString('https://example.com:8080/path')->withoutPort();
+        self::assertNull($url->getPort());
+    }
+
+    public function testWithoutUserInfo(): void
+    {
+        $url = Url::fromString('https://user:pass@example.com')->withoutUserInfo();
+        self::assertSame('', $url->getUserInfo());
+        self::assertNull($url->getUser());
+        self::assertNull($url->getPassword());
+    }
+
+    public function testWithoutPath(): void
+    {
+        $url = Url::fromString('https://example.com/some/path')->withoutPath();
+        self::assertSame('', $url->getPath());
+    }
+
+    public function testWithoutFragment(): void
+    {
+        $url = Url::fromString('https://example.com#frag')->withoutFragment();
+        self::assertSame('', $url->getFragment());
+    }
+
+    public function testWithoutQueryRemovesAll(): void
+    {
+        $url = Url::fromString('https://example.com?a=1&b=2')->withoutQuery();
+        self::assertSame('', $url->getQuery());
+        self::assertSame([], $url->getQueryAsArray());
+    }
+
+    public function testWithoutQueryRemovesSpecific(): void
+    {
+        $url = Url::fromString('https://example.com?a=1&b=2&c=3')
+            ->withoutQuery(['a', 'c']);
+
+        self::assertSame(['b' => '2'], $url->getQueryAsArray());
+        self::assertSame('b=2', $url->getQuery());
+    }
+
+    // --- Query manipulation ---
+
+    public function testWithQueryReplacesEntireQuery(): void
+    {
+        $url = Url::fromString('https://example.com?a=1&b=2')
+            ->withQuery('x=10&y=20');
+
+        self::assertSame(['x' => '10', 'y' => '20'], $url->getQueryAsArray());
+    }
+
+    public function testWithQueryEmptyRemovesQuery(): void
+    {
+        $url = Url::fromString('https://example.com?a=1')
+            ->withQuery('');
+
+        self::assertSame('', $url->getQuery());
+        self::assertSame([], $url->getQueryAsArray());
+    }
+
+    public function testWithQueryParamsMerges(): void
+    {
+        $url = Url::fromString('https://example.com?a=1&b=2')
+            ->withQueryParams(['b' => '20', 'c' => '30']);
+
+        self::assertSame(['a' => '1', 'b' => '20', 'c' => '30'], $url->getQueryAsArray());
+    }
+
+    public function testQueryPreservesValuelessParams(): void
+    {
+        $url = Url::fromString('https://example.com?flag&key=value');
+        $query = $url->getQueryAsArray();
+
+        self::assertArrayHasKey('flag', $query);
+        self::assertSame('', $query['flag']);
+        self::assertSame('value', $query['key']);
+        self::assertSame('flag&key=value', $url->getQuery());
+    }
+
+    public function testQueryWithZeroValue(): void
+    {
+        $url = Url::fromString('https://example.com?count=0');
+        self::assertSame('0', $url->getQueryAsArray()['count']);
+        self::assertSame('count=0', $url->getQuery());
+    }
+
+    // --- PSR-7 getters return empty strings (not null) ---
+
+    public function testEmptyUrlReturnsPsr7Defaults(): void
+    {
+        $url = new Url();
+
+        self::assertSame('', $url->getScheme());
+        self::assertSame('', $url->getHost());
+        self::assertSame('', $url->getPath());
+        self::assertSame('', $url->getQuery());
+        self::assertSame('', $url->getFragment());
+        self::assertSame('', $url->getUserInfo());
+        self::assertSame('', $url->getAuthority());
+        self::assertNull($url->getPort());
+    }
+
+    // --- withScheme/withHost/withPort empty values ---
+
+    public function testWithEmptySchemeRemovesScheme(): void
+    {
+        $url = Url::fromString('https://example.com')->withScheme('');
+        self::assertSame('', $url->getScheme());
+    }
+
+    public function testWithEmptyHostRemovesHost(): void
+    {
+        $url = Url::fromString('https://example.com')->withHost('');
+        self::assertSame('', $url->getHost());
+    }
+
+    public function testWithNullPortRemovesPort(): void
+    {
+        $url = Url::fromString('https://example.com:8080')->withPort(null);
+        self::assertNull($url->getPort());
+    }
+
+    public function testWithEmptyUserInfoRemovesUserInfo(): void
+    {
+        $url = Url::fromString('https://user:pass@example.com')->withUserInfo('');
+        self::assertSame('', $url->getUserInfo());
+        self::assertNull($url->getUser());
+    }
+
+    // --- Authority ---
+
+    public function testGetAuthorityFull(): void
+    {
+        $url = Url::fromString('https://user:pass@example.com:8080/path');
+        self::assertSame('user:pass@example.com:8080', $url->getAuthority());
+    }
+
+    public function testGetAuthorityHostOnly(): void
+    {
+        $url = Url::fromString('https://example.com/path');
+        self::assertSame('example.com', $url->getAuthority());
+    }
+
+    public function testGetAuthorityEmpty(): void
+    {
+        $url = Url::fromString('/just/a/path');
+        self::assertSame('', $url->getAuthority());
+    }
+
+    // --- User info ---
+
+    public function testGetUserInfoWithPassword(): void
+    {
+        $url = Url::fromString('https://admin:secret@example.com');
+        self::assertSame('admin:secret', $url->getUserInfo());
+        self::assertSame('admin', $url->getUser());
+        self::assertSame('secret', $url->getPassword());
+    }
+
+    public function testGetUserInfoWithoutPassword(): void
+    {
+        $url = Url::fromString('https://admin@example.com');
+        self::assertSame('admin', $url->getUserInfo());
+        self::assertSame('admin', $url->getUser());
+        self::assertNull($url->getPassword());
+    }
+
+    // --- URL building ---
+
+    public function testGetFullUrl(): void
+    {
+        $url = Url::fromString(self::FULL_URL);
+        self::assertSame(self::FULL_URL, $url->getFullUrl());
+    }
+
+    public function testGetRelUrl(): void
+    {
+        $url = Url::fromString(self::FULL_URL);
+        self::assertSame(self::REL_URL, $url->getRelUrl());
+    }
+
+    public function testBuildUrlWithoutUserInfo(): void
+    {
+        $url = Url::fromString('https://user:pass@example.com:8080/path');
+        $built = $url->buildUrl(withUserInfo: false);
+        self::assertSame('https://example.com:8080/path', $built);
+    }
+
+    public function testBuildUrlWithoutPort(): void
+    {
+        $url = Url::fromString('https://example.com:8080/path');
+        $built = $url->buildUrl(withPort: false);
+        self::assertSame('https://example.com/path', $built);
+    }
+
+    public function testBuildUrlWithoutQuery(): void
+    {
+        $url = Url::fromString('https://example.com/path?q=1');
+        $built = $url->buildUrl(withQuery: false);
+        self::assertSame('https://example.com/path', $built);
+    }
+
+    public function testBuildUrlWithoutFragment(): void
+    {
+        $url = Url::fromString('https://example.com/path#frag');
+        $built = $url->buildUrl(withFragment: false);
+        self::assertSame('https://example.com/path', $built);
+    }
+
+    public function testBuildUrlNoHostDefaultsToSlash(): void
+    {
+        $url = new Url();
+        self::assertSame('/', $url->buildUrl());
+    }
+
+    public function testBuildUrlDefaultsToHttpScheme(): void
+    {
+        $url = (new Url())->withHost('example.com');
+        self::assertSame('http://example.com/', $url->buildUrl());
+    }
+
+    // --- __toString ---
+
+    public function testToString(): void
+    {
+        $url = Url::fromString(self::FULL_URL);
+        self::assertSame(self::FULL_URL, (string) $url);
+    }
+
+    public function testToStringEmpty(): void
+    {
+        $url = new Url();
+        self::assertSame('/', (string) $url);
+    }
+
+    // --- Interface compliance ---
+
+    public function testImplementsUriInterface(): void
+    {
+        $url = new Url();
+        self::assertInstanceOf(UriInterface::class, $url);
+        self::assertInstanceOf(UrlInterface::class, $url);
+    }
+
+    // --- Special characters ---
+
+    public function testQuerySpecialCharacters(): void
+    {
+        $url = (new Url())
+            ->withHost('example.com')
+            ->withQueryParams(['q' => 'hello world', 'tag' => 'a&b']);
+
+        self::assertSame('q=hello+world&tag=a%26b', $url->getQuery());
+    }
+
+    public function testFragmentEncoding(): void
+    {
+        $url = (new Url())
+            ->withHost('example.com')
+            ->withFragment('section one');
+
+        self::assertStringContainsString('#section+one', $url->getFullUrl());
+    }
+
+    public function testPathWithEncodedCharacters(): void
+    {
+        $url = Url::fromString('https://example.com/path%20with%20spaces');
+        self::assertSame('/path%20with%20spaces', $url->getPath());
+    }
+
+    // --- Edge cases ---
+
+    public function testFromStringWithPortZero(): void
+    {
+        // Port 0 is technically valid
+        $url = Url::fromString('http://example.com:0/path');
+        self::assertSame(0, $url->getPort());
+    }
+
+    #[DataProvider('urlRoundTripProvider')]
+    public function testUrlRoundTrip(string $input, string $expectedFull): void
+    {
+        $url = Url::fromString($input);
+        self::assertSame($expectedFull, $url->getFullUrl());
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function urlRoundTripProvider(): array
+    {
+        return [
+            'full url' => [
+                'https://user:pass@example.com:8080/path?q=1#frag',
+                'https://user:pass@example.com:8080/path?q=1#frag',
+            ],
+            'scheme and host' => [
+                'https://example.com',
+                'https://example.com/',
+            ],
+            'with path' => [
+                'https://example.com/foo/bar',
+                'https://example.com/foo/bar',
+            ],
+            'with query' => [
+                'https://example.com/path?a=1&b=2',
+                'https://example.com/path?a=1&b=2',
+            ],
+            'http scheme' => [
+                'http://example.com/',
+                'http://example.com/',
+            ],
+        ];
+    }
+
+    // --- fromPsr7Uri ---
+
+    public function testFromPsr7Uri(): void
+    {
+        $source = Url::fromString(self::FULL_URL);
+        $copy = Url::fromPsr7Uri($source);
+
+        self::assertSame($source->getScheme(), $copy->getScheme());
+        self::assertSame($source->getHost(), $copy->getHost());
+        self::assertSame($source->getPort(), $copy->getPort());
+        self::assertSame($source->getPath(), $copy->getPath());
+        self::assertSame($source->getQuery(), $copy->getQuery());
+        self::assertSame($source->getFragment(), $copy->getFragment());
+        self::assertSame($source->getUserInfo(), $copy->getUserInfo());
+    }
+
+    // --- Chaining ---
+
+    public function testComplexChaining(): void
+    {
+        $url = (new Url())
+            ->withScheme('https')
+            ->withHost('api.example.com')
+            ->withPort(443)
+            ->withPath('/v2/users')
+            ->withQueryParams(['page' => '1', 'limit' => '50'])
+            ->withFragment('results');
+
+        self::assertSame(
+            'https://api.example.com:443/v2/users?page=1&limit=50#results',
+            $url->getFullUrl(),
+        );
+
+        $modified = $url
+            ->withoutPort()
+            ->withQueryParams(['page' => '2'])
+            ->withoutFragment();
+
+        self::assertSame(
+            'https://api.example.com/v2/users?page=2&limit=50',
+            $modified->getFullUrl(),
+        );
+
+        // Original unchanged
+        self::assertSame(443, $url->getPort());
+        self::assertSame('results', $url->getFragment());
+    }
 }
