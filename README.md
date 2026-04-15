@@ -1,47 +1,106 @@
-# URL library
+# codeinc/url
 
-A PHP 7 library to manipulates URLs. This library is compatible with [PSR-7](https://www.php-fig.org/psr/psr-7/) [`UriInterface`](https://www.php-fig.org/psr/psr-7/#35-psrhttpmessageuriinterface) through the [`Psr7Url`](src/Psr7Url.php) and [`Psr7ServerUrl`] classes.
+[![Tests](https://github.com/codeinchq/url/actions/workflows/tests.yml/badge.svg)](https://github.com/codeinchq/url/actions/workflows/tests.yml)
+[![Latest Stable Version](https://poser.pugx.org/codeinc/url/v/stable)](https://packagist.org/packages/codeinc/url)
+[![License](https://poser.pugx.org/codeinc/url/license)](https://packagist.org/packages/codeinc/url)
 
-## Usage
+A PHP library for URL manipulation, implementing [PSR-7](https://www.php-fig.org/psr/psr-7/) `UriInterface`.
 
-```php
-<?php
-use CodeInc\Url\Url;
+## Requirements
 
-// parsing a URL
-$url = Url::fromString("https://www.google.com/?q=A+great+search");
-if (isset($url->getQueryAsArray()["p"])) {
-	echo $url->getQueryAsArray()["p"];
-}
-
-// building a URL
-$url = (new Url())
-    ->withHost("www.google.com")
-    ->withoutScheme("https")
-    ->withQuery(["q", "A great search"]);
-echo $url;
-
-// getting the current URL
-$currentUrl = Url::fromGlobals();
-
-## Tests
-
-A unit test is available for the [`Url`](src/Url.php) class in the [`UrlTest`](tests/UrlTest.php) class. 
-
-To run the tests using [PHPUnit](https://phpunit.de/):
-
-```bash
-./vendor/bin/phpunit tests/UrlTest.php
-```
-
+- PHP 8.2+
 
 ## Installation
-This library is available through [Packagist](https://packagist.org/packages/codeinc/url) and can be installed using [Composer](https://getcomposer.org/): 
 
 ```bash
 composer require codeinc/url
 ```
 
+## Usage
+
+### Parsing a URL
+
+```php
+use CodeInc\Url\Url;
+
+$url = Url::fromString('https://www.example.com/search?q=php&page=1#results');
+
+$url->getScheme();       // 'https'
+$url->getHost();         // 'www.example.com'
+$url->getPath();         // '/search'
+$url->getQuery();        // 'q=php&page=1'
+$url->getQueryAsArray(); // ['q' => 'php', 'page' => '1']
+$url->getFragment();     // 'results'
+```
+
+### Building a URL
+
+```php
+$url = (new Url())
+    ->withScheme('https')
+    ->withHost('api.example.com')
+    ->withPath('/v2/users')
+    ->withQueryParams(['page' => '1', 'limit' => '50']);
+
+echo $url; // https://api.example.com/v2/users?page=1&limit=50
+```
+
+### Modifying a URL
+
+All `with*` methods return a new immutable instance:
+
+```php
+$url = Url::fromString('https://example.com/path?a=1&b=2#frag');
+
+$modified = $url
+    ->withScheme('http')
+    ->withQueryParams(['c' => '3'])
+    ->withoutFragment();
+
+echo $modified; // http://example.com/path?a=1&b=2&c=3
+echo $url;      // https://example.com/path?a=1&b=2#frag (unchanged)
+```
+
+### Removing components
+
+```php
+$url->withoutScheme();
+$url->withoutHost();
+$url->withoutPort();
+$url->withoutUserInfo();
+$url->withoutPath();
+$url->withoutFragment();
+$url->withoutQuery();            // removes entire query string
+$url->withoutQuery(['a', 'b']); // removes specific parameters
+```
+
+### PSR-7 interop
+
+```php
+// From a PSR-7 UriInterface
+$url = Url::fromPsr7Uri($psr7Uri);
+
+// From a PSR-7 ServerRequestInterface
+$url = Url::fromPsr7Request($serverRequest);
+
+// Use anywhere a UriInterface is expected
+function processUri(UriInterface $uri): void { /* ... */ }
+processUri($url);
+```
+
+### Getting the current URL
+
+```php
+$url = Url::fromGlobals();
+```
+
+## Tests
+
+```bash
+composer install
+vendor/bin/phpunit
+```
+
 ## License
 
-The library is published under the MIT license (see [`LICENSE`](LICENSE) file).
+This library is published under the MIT license (see [LICENSE](LICENSE) file).

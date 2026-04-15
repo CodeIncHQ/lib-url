@@ -1,34 +1,37 @@
 {
-  "name": "codeinc/url",
-  "version": "1.5.4",
-  "description": "URL manipulation library",
-  "homepage": "https://github.com/CodeIncHQ/Url",
-  "type": "library",
-  "license": "MIT",
-  "require": {
-    "php": ">=7.1",
-    "psr/http-message": "^1.0"
-  },
-  "require-dev": {
-    "phpunit/phpunit": "^7"
-  },
-  "autoload": {
-    "psr-4": { "CodeInc\\Url\\": "src" }
-  },
-  "autoload-dev": {
-    "psr-4": { "CodeInc\\Url\\Tests\\": "tests" }
-  },
-  "authors": [
-    {
-      "name": "Joan Fabrégat",
-      "email": "joan@codeinc.fr",
-      "homepage": "https://www.codeinc.fr",
-      "role": "developer"
+    "name": "codeinc/url",
+    "description": "A PHP library for URL manipulation, compatible with PSR-7 UriInterface",
+    "homepage": "https://github.com/codeinchq/url",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "psr/http-message": "^2.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "CodeInc\\Url\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CodeInc\\Url\\Tests\\": "tests/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Joan Fabrégat",
+            "email": "joan@codeinc.fr",
+            "homepage": "https://www.codeinc.fr",
+            "role": "developer"
+        }
+    ],
+    "config": {
+        "preferred-install": {
+            "*": "dist"
+        }
     }
-  ],
-  "config": {
-    "preferred-install": {
-      "*": "dist"
-    }
-  }
 }
