@@ -2,6 +2,8 @@
 
 [![Tests](https://github.com/codeinchq/url/actions/workflows/tests.yml/badge.svg)](https://github.com/codeinchq/url/actions/workflows/tests.yml)
 [![Latest Stable Version](https://poser.pugx.org/codeinc/url/v/stable)](https://packagist.org/packages/codeinc/url)
+[![PHP](https://poser.pugx.org/codeinc/url/require/php)](https://packagist.org/packages/codeinc/url)
+[![Total Downloads](https://poser.pugx.org/codeinc/url/downloads)](https://packagist.org/packages/codeinc/url)
 [![License](https://poser.pugx.org/codeinc/url/license)](https://packagist.org/packages/codeinc/url)
 
 A PHP library for URL manipulation, implementing [PSR-7](https://www.php-fig.org/psr/psr-7/) `UriInterface`.
